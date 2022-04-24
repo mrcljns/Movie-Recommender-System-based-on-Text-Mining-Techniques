@@ -18,7 +18,7 @@ list_titles = []
 list_year = []
 
 # Iterating through IMDb Top 250 and extracting title and release year 
-# For more details check out: https://www.geeksforgeeks.org/scrape-imdb-movie-rating-and-details-using-python/
+# For more details, check out: https://www.geeksforgeeks.org/scrape-imdb-movie-rating-and-details-using-python/
 for i in range(0, len(movies)):
      
     movie_string = movies[i].get_text()
