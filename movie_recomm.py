@@ -30,7 +30,7 @@ def tf_idf(movie, lexicon, df):
     """
     Input: preprocessed movie plot
     Purpose: Turn preprocessed movie plot to a vector of tf-idf
-    Output: list of tf vectors 
+    Output: list of tf-idf vectors 
     """
     vec = OrderedDict((token, 0) for token in lexicon)
     text_vectors=[]
