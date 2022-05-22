@@ -7,7 +7,6 @@ from plot_scraper import get_plot
 from numpy import dot
 from numpy.linalg import norm
 from collections import OrderedDict
-import copy
 import re
 
 def preprocess_text(text):
@@ -27,34 +26,50 @@ def preprocess_text(text):
 
     return stemmed_tokens
 
-def processing_plots(movie_1, movie_2):
+def tf_idf(movie, lexicon, df):
     """
-    Input: two preprocessed movie plots
-    Purpose: Turn preprocessed movie plots to a list of term frequency vectors
+    Input: preprocessed movie plot
+    Purpose: Turn preprocessed movie plot to a vector of tf-idf
     Output: list of tf vectors 
     """
-    plot_tokens = []
-    plot_tokens.append(movie_1)
-    plot_tokens.append(movie_2)
-    all_plot_tokens = sum(plot_tokens, [])
-    lexicon = sorted(set(all_plot_tokens))
-    zero_vector = OrderedDict((token, 0) for token in lexicon)
+    vec = OrderedDict((token, 0) for token in lexicon)
     text_vectors=[]
-    for token in plot_tokens:
-        vec=copy.copy(zero_vector)
-        token_counts = Counter(token)
-        for key, value in token_counts.items():
-            vec[key] = value / len(lexicon)
-        text_vectors.append([val for val in vec.values()])
+    token_counts = Counter(movie)
+    for key, value in token_counts.items():
+        vec[key] = value / (len(lexicon)*df[key])
+    for val in vec.values():
+        text_vectors.append(val)
     return text_vectors
 
-def cos_sim(results):
+def doc_freq(plots, input):
+    """
+    Input: pandas data frame column and input plot
+    Purpose: Calculate document frequency values
+    Output: Dictionary containing document frequency values
+    """
+    df = {}
+    for i in range(len(plots)):
+        for token in plots[i]:
+            try:
+                df[token].add(i)
+            except:
+                df[token] = {i}
+    for token in input:
+        try:
+                df[token].add(i)
+        except:
+                df[token] = {i}
+    for word in df:
+        df[word] = len(df[word])/len(plots)
+    return df
+
+def cos_sim(movie, input):
     """
     Input: tf vectors
-    Puropse: Calculates the cosine similarity
+    Purpose: Calculates the cosine similarity
     Output: cosine similarity
     """
-    cos_sim = dot(results[0], results[1])/(norm(results[0])*norm(results[1]))
+    cos_sim = dot(movie, input)/(norm(movie)*norm(input))
     return cos_sim
 
 moviedb = pd.read_csv('moviedb.csv')
@@ -65,25 +80,30 @@ movie_input = str(input("Type in movie title: "))
 movie_year_input = str(input("(Optional) What year did it come out?: "))
 input_plot = get_plot(movie_input, movie_year_input)
 
-try:
-    input_plot = preprocess_text(input_plot)
 
-    moviedb_vectors = []
+input_plot = preprocess_text(input_plot)
 
-    for title in moviedb['plot']:
-        moviedb_vectors.append(processing_plots(input_plot, title))
+df = doc_freq(moviedb['plot'], input_plot)
 
-    result_vectors = [cos_sim(i) for i in moviedb_vectors]
+all_plot_tokens = sum(moviedb['plot'], []) + input_plot
 
-    moviedb['similarity'] = result_vectors
+lexicon = sorted(set(all_plot_tokens))
+
+moviedb_vectors = []
+
+for title in moviedb['plot']:
+   moviedb_vectors.append(tf_idf(title, lexicon, df))
+
+input_vector = tf_idf(input_plot, lexicon, df)
+
+result_vectors = [cos_sim(i, input_vector) for i in moviedb_vectors]
+
+moviedb['similarity'] = result_vectors
 
     # Dropping duplicate of the input title (if there's one). This prevents recommending excatly the same title that was
     # used as an input.
-    moviedb = moviedb.drop(moviedb[moviedb["movie_title"] == (re.sub(r'\s\([^)]*\)', '', movie_input))].index)
+moviedb = moviedb.drop(moviedb[moviedb["movie_title"] == (re.sub(r'\s\([^)]*\)', '', movie_input))].index)
 
-    print("The recommendations are:")
+print("The recommendations are:")
     # Printing 5 closest titles
-    print(moviedb.sort_values(by=['similarity'], ascending=False).movie_title.head(5).to_string(index=False))
-
-except:
-    print("No such title.")
+print(moviedb.sort_values(by=['similarity'], ascending=False).movie_title.head(5).to_string(index=False))
